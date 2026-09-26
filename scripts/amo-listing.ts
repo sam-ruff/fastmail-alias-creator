@@ -18,6 +18,21 @@ export interface AmoDeps {
 
 const MAX_ATTEMPTS = 4;
 const REQUEST_TIMEOUT_MS = 120_000;
+// Edits share an hourly quota; waiting out a long throttle would only outlast the CI job.
+const MAX_THROTTLE_WAIT_MS = 5 * 60_000;
+
+export const LISTING_PARTS = ["details", "icon", "policy", "screenshots"] as const;
+export type ListingPart = (typeof LISTING_PARTS)[number];
+
+export function parseParts(args: string[]): Set<ListingPart> {
+  if (args.length === 0) return new Set(LISTING_PARTS);
+  for (const arg of args) {
+    if (!(LISTING_PARTS as readonly string[]).includes(arg)) {
+      throw new Error(`Unknown listing part "${arg}"; expected ${LISTING_PARTS.join(", ")}`);
+    }
+  }
+  return new Set(args as ListingPart[]);
+}
 
 /** AMO throttles uploads and says how long to wait, in a header or the error body. */
 export function throttleDelayMs(retryAfter: string | null, body: string): number {
@@ -124,16 +139,26 @@ export class AmoListing {
    * Uploads run in order, so a listing with n screenshots already has the first n. Only the
    * rest are sent, which lets a run interrupted part way resume without duplicates.
    */
-  async sync(content: ListingContent): Promise<void> {
-    await this.setDetails(content.details);
-    this.log("Listing text updated");
-    await this.setIcon(content.icon);
-    this.log("Icon uploaded");
-    await this.setPrivacyPolicy(content.policy);
-    this.log("Privacy policy updated");
+  async sync(content: ListingContent, parts: Set<ListingPart>): Promise<void> {
+    if (parts.has("details")) {
+      await this.setDetails(content.details);
+      this.log("Listing text updated");
+    }
+    if (parts.has("icon")) {
+      await this.setIcon(content.icon);
+      this.log("Icon uploaded");
+    }
+    if (parts.has("policy")) {
+      await this.setPrivacyPolicy(content.policy);
+      this.log("Privacy policy updated");
+    }
+    if (parts.has("screenshots")) await this.syncScreenshots(content.screenshots);
+  }
+
+  private async syncScreenshots(screenshots: Screenshot[]): Promise<void> {
     const existing = await this.previewCount();
-    this.log(`Listing has ${existing} of ${content.screenshots.length} screenshots`);
-    for (const [position, screenshot] of content.screenshots.entries()) {
+    this.log(`Listing has ${existing} of ${screenshots.length} screenshots`);
+    for (const [position, screenshot] of screenshots.entries()) {
       if (position < existing) continue;
       await this.uploadPreview(screenshot, position);
       this.log(`Uploaded ${screenshot.name}`);
@@ -160,6 +185,12 @@ export class AmoListing {
       const method = init.method ?? "GET";
       if (response.status === 429 && attempt < MAX_ATTEMPTS) {
         const delay = throttleDelayMs(response.headers.get("Retry-After"), body);
+        if (delay > MAX_THROTTLE_WAIT_MS) {
+          const retryAt = new Date(this.now() + delay).toISOString().slice(11, 16);
+          throw new Error(
+            `AMO throttled ${method} ${path || "addon"} for ${Math.ceil(delay / 60_000)} minutes; run the Listing workflow again after ${retryAt} UTC`,
+          );
+        }
         this.log(`Throttled on ${method} ${path || "addon"}, retrying in ${delay / 1000}s`);
         await this.sleep(delay);
         continue;
@@ -190,14 +221,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     { fetch, apiKey: env("WEB_EXT_API_KEY"), apiSecret: env("WEB_EXT_API_SECRET") },
     manifest.browser_specific_settings.gecko.id,
   );
-  await listing.sync({
-    details,
-    icon: image("amo/icon.png"),
-    policy: markdownToPlainText(readFileSync("PRIVACY.md", "utf8")),
-    screenshots: readdirSync(dir)
-      .filter((name) => name.endsWith(".png"))
-      .sort()
-      .map((name) => image(join(dir, name))),
-  });
-  console.log("Listing updated");
+  const parts = parseParts(process.argv.slice(2));
+  await listing.sync(
+    {
+      details,
+      icon: image("amo/icon.png"),
+      policy: markdownToPlainText(readFileSync("PRIVACY.md", "utf8")),
+      screenshots: readdirSync(dir)
+        .filter((name) => name.endsWith(".png"))
+        .sort()
+        .map((name) => image(join(dir, name))),
+    },
+    parts,
+  );
+  console.log(`Listing updated: ${[...parts].join(", ")}`);
 }

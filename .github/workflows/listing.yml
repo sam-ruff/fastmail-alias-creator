@@ -1,16 +1,20 @@
 name: Listing
 
 # Pushes the addons.mozilla.org listing text, icon, privacy policy and screenshots
-# without cutting a release.
+# without cutting a release. AMO allows few listing edits an hour, so a push only
+# sends the parts whose files changed.
 on:
   push:
     branches: [main]
     paths:
       - "amo/**"
       - "PRIVACY.md"
-      - "scripts/amo-listing.ts"
-      - ".github/workflows/listing.yml"
   workflow_dispatch:
+    inputs:
+      parts:
+        description: "Parts to sync: details, icon, policy, screenshots"
+        default: "details icon policy screenshots"
+        required: true
 
 permissions:
   contents: read
@@ -22,17 +26,38 @@ concurrency:
 jobs:
   sync:
     runs-on: [self-hosted, sophie-small]
-    # Uploads are throttled to roughly one a minute, and each retry waits that out.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "24.21.0"
-      - name: Update the addons.mozilla.org listing
-        run: node scripts/amo-listing.ts
+      - name: Work out which parts changed
+        id: parts
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            echo "parts=$INPUT_PARTS" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          parts=""
+          grep -qx "amo/metadata.json" <<<"$changed" && parts="$parts details"
+          grep -qx "amo/icon.png" <<<"$changed" && parts="$parts icon"
+          grep -qx "PRIVACY.md" <<<"$changed" && parts="$parts policy"
+          grep -q "^amo/screenshots/" <<<"$changed" && parts="$parts screenshots"
+          echo "parts=$parts" >> "$GITHUB_OUTPUT"
         env:
+          EVENT: ${{ github.event_name }}
+          INPUT_PARTS: ${{ inputs.parts }}
+          BEFORE: ${{ github.event.before }}
+      - name: Update the addons.mozilla.org listing
+        if: steps.parts.outputs.parts != ''
+        # Word splitting turns the space separated list into arguments.
+        run: node scripts/amo-listing.ts $PARTS
+        env:
+          PARTS: ${{ steps.parts.outputs.parts }}
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}

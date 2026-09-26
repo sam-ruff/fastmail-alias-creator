@@ -4,9 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AmoListing,
   createAmoJwt,
+  LISTING_PARTS,
   markdownToPlainText,
+  parseParts,
   throttleDelayMs,
 } from "../../scripts/amo-listing";
+
+const ALL = new Set(LISTING_PARTS);
 
 const ADDON = "addon@example.test";
 const BASE = "https://addons.mozilla.org/api/v5/addons/addon/addon%40example.test/";
@@ -75,6 +79,17 @@ describe("createAmoJwt", () => {
   });
 });
 
+describe("parseParts", () => {
+  it("defaults to every part", () => {
+    expect(parseParts([])).toEqual(new Set(LISTING_PARTS));
+  });
+
+  it("accepts a subset and rejects unknown names", () => {
+    expect(parseParts(["icon", "policy"])).toEqual(new Set(["icon", "policy"]));
+    expect(() => parseParts(["icons"])).toThrow(/Unknown listing part "icons"/);
+  });
+});
+
 describe("throttleDelayMs", () => {
   it("prefers Retry-After, then the body, then a minute, plus a second of margin", () => {
     expect(throttleDelayMs("10", "")).toBe(11_000);
@@ -110,7 +125,7 @@ describe("AmoListing", () => {
 
   it("syncs details, icon and policy, then uploads screenshots in order", async () => {
     const fetchSpy = withPreviews([]);
-    await listing(fetchSpy).sync(content);
+    await listing(fetchSpy).sync(content, ALL);
 
     const calls = fetchSpy.mock.calls.map(([url, init]) => `${init?.method} ${url}`);
     expect(calls).toEqual([
@@ -132,19 +147,45 @@ describe("AmoListing", () => {
 
   it("leaves a complete set of screenshots alone", async () => {
     const fetchSpy = withPreviews([{ id: 1 }, { id: 2 }]);
-    await listing(fetchSpy).sync(content);
+    await listing(fetchSpy).sync(content, ALL);
     expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 
   it("uploads only the screenshots a previous run did not reach", async () => {
     const fetchSpy = withPreviews([{ id: 1 }]);
-    await listing(fetchSpy).sync(content);
+    await listing(fetchSpy).sync(content, ALL);
 
     const posts = fetchSpy.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(posts).toHaveLength(1);
     const form = posts[0]?.[1]?.body as FormData;
     expect((form.get("image") as File).name).toBe("2.png");
     expect(form.get("position")).toBe("1");
+  });
+
+  it("only touches the requested parts", async () => {
+    const fetchSpy = withPreviews([]);
+    await listing(fetchSpy).sync(content, new Set(["policy", "screenshots"] as const));
+
+    const calls = fetchSpy.mock.calls.map(([url, init]) => `${init?.method} ${url}`);
+    expect(calls).toEqual([
+      `PATCH ${BASE}eula_policy/`,
+      `GET ${BASE}`,
+      `POST ${BASE}previews/`,
+      `POST ${BASE}previews/`,
+    ]);
+  });
+
+  it("fails fast with a retry time when the throttle is long", async () => {
+    const sleep = vi.fn(async (_ms: number) => {});
+    const fetchSpy = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response('{"detail":"Expected available in 1987 seconds."}', { status: 429 }),
+      );
+    await expect(listing(fetchSpy, sleep).setPrivacyPolicy("p")).rejects.toThrow(
+      "for 34 minutes; run the Listing workflow again after 00:33 UTC",
+    );
+    expect(sleep).not.toHaveBeenCalled();
   });
 
   it("waits out throttling and retries with a fresh request", async () => {
