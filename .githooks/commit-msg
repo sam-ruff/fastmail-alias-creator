@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+subject=$(head -n 1 "$1")
+pattern='^(feat|fix|perf|refactor|test|docs|style|build|ci|chore|revert)(\([a-z0-9_/-]+\))?!?: .+'
+if ! grep -qE "$pattern" <<<"$subject"; then
+  echo "Use a Conventional Commit, e.g. feat(popup): add alias search" >&2
+  exit 1
+fi

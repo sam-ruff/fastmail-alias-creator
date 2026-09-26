@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Fastmail Alias Creator",
+  "version": "0.1.0",
+  "description": "Create Fastmail masked email aliases for the site you are on and keep track of where each one is used.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "fastmail-alias-creator@samruff.dev",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "action": {
+    "default_title": "Fastmail aliases",
+    "default_popup": "popup/index.html",
+    "default_icon": "icons/icon.svg"
+  },
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "permissions": ["storage", "activeTab", "clipboardWrite", "identity"],
+  "host_permissions": ["https://api.fastmail.com/*"]
+}

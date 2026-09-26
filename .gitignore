@@ -1,0 +1,11 @@
+/node_modules/
+/dist/
+/artifacts/
+*.log
+.env
+.env.*
+
+# Local-only notes for agents; see AGENTS.md. The pre-commit hook refuses to commit it.
+PRIVATE.md
+
+/.claude/

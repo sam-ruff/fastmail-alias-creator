@@ -1,0 +1,80 @@
+name: Quality and release artifacts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, sophie]
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24.21.0"
+      - run: npm ci
+      - name: Plan without publishing
+        id: plan
+        run: npm run release:plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-plan
+          path: artifacts/release-plan.json
+          if-no-files-found: error
+          retention-days: 7
+
+  quality:
+    needs: plan
+    if: >-
+      always() && !cancelled() &&
+      (needs.plan.result == 'success' || needs.plan.result == 'skipped') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, sophie]
+    timeout-minutes: 20
+    env:
+      RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24.21.0"
+      - run: npm ci
+      - name: Stamp the planned version
+        if: env.RELEASE_VERSION != ''
+        run: node scripts/stamp-version.ts "$RELEASE_VERSION"
+      - name: Format, lint, types, tests, build and extension lint
+        run: npm run check
+      - name: Package the tested build
+        if: env.RELEASE_VERSION != ''
+        run: |
+          npm run package
+          cp -r dist artifacts/release/dist
+          (cd artifacts/release && sha256sum *.xpi > SHA256SUMS)
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        if: env.RELEASE_VERSION != ''
+        with:
+          name: release-extension
+          path: artifacts/release/
+          if-no-files-found: error
+          retention-days: 7

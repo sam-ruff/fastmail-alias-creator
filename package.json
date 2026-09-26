@@ -1,0 +1,50 @@
+{
+  "name": "fastmail-alias-creator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.dev.config.ts",
+    "build": "vite build && vite build --config vite.background.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "lint": "prettier --check . && eslint . && tsc --noEmit",
+    "lint:extension": "web-ext lint --source-dir dist",
+    "check": "npm run lint && npm test && npm run build && npm run lint:extension",
+    "format": "prettier --write .",
+    "start": "web-ext run --source-dir dist",
+    "package": "web-ext build --source-dir dist --artifacts-dir artifacts/release --filename \"fastmail-alias-creator-{version}.xpi\" --overwrite-dest",
+    "release:plan": "node scripts/release-plan.ts",
+    "release": "semantic-release",
+    "prepare": "git config core.hooksPath .githooks || true"
+  },
+  "dependencies": {
+    "preact": "^10.29.8",
+    "tldts": "^7.4.15",
+    "webextension-polyfill": "^0.12.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^11.0.1",
+    "@semantic-release/github": "^12.0.10",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@testing-library/preact": "^3.2.4",
+    "@types/node": "^26.6.3",
+    "@types/webextension-polyfill": "^0.12.6",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^20.14.5",
+    "prettier": "^3.9.9",
+    "semantic-release": "^25.0.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2",
+    "web-ext": "^10.7.0"
+  }
+}
