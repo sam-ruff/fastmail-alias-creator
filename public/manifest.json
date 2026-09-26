@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fastmail Alias Creator",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Create Fastmail masked email aliases for the site you are on and keep track of where each one is used.",
   "browser_specific_settings": {
     "gecko": {
