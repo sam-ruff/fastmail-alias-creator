@@ -21,6 +21,8 @@ export default defineConfig({
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: true,
     target: "firefox140",
+    // Readable output keeps Mozilla's review simple; the size cost is irrelevant for an extension.
+    minify: false,
     rollupOptions: {
       input: {
         popup: resolve(__dirname, "src/popup/index.html"),

@@ -10,6 +10,7 @@ export default defineConfig({
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: false,
     target: "firefox140",
+    minify: false,
     lib: {
       entry: resolve(__dirname, "src/background/index.ts"),
       formats: ["iife"],

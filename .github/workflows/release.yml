@@ -63,8 +63,9 @@ jobs:
       - name: Sign the tested build with Mozilla
         if: steps.plan.outputs.version != '' && env.SIGN == 'true'
         run: |
+          git archive --format=zip -o artifacts/source.zip HEAD
           npx web-ext sign --source-dir artifacts/release/dist --channel unlisted \
-            --artifacts-dir artifacts/signed
+            --artifacts-dir artifacts/signed --upload-source-code artifacts/source.zip
           rm artifacts/release/*.xpi
           cp artifacts/signed/*.xpi "artifacts/release/fastmail-alias-creator-$VERSION.xpi"
           (cd artifacts/release && sha256sum *.xpi > SHA256SUMS)
