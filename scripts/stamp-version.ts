@@ -7,9 +7,12 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
   throw new Error(`Expected a plain x.y.z version, got ${version ?? "nothing"}`);
 }
 
+// Only the top-level version line changes so the files keep their Prettier formatting.
+const VERSION_LINE = /^( {2}"version": )"[^"]*"/m;
+
 for (const file of ["package.json", "public/manifest.json"]) {
-  const json = JSON.parse(readFileSync(file, "utf8")) as { version: string };
-  json.version = version;
-  writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+  const text = readFileSync(file, "utf8");
+  if (!VERSION_LINE.test(text)) throw new Error(`No top-level version in ${file}`);
+  writeFileSync(file, text.replace(VERSION_LINE, `$1"${version}"`));
 }
 console.log(`Stamped ${version}`);
