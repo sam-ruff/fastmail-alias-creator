@@ -13,9 +13,11 @@ export interface AmoDeps {
   now?: () => number;
   randomId?: () => string;
   sleep?: (ms: number) => Promise<void>;
+  log?: (message: string) => void;
 }
 
 const MAX_ATTEMPTS = 4;
+const REQUEST_TIMEOUT_MS = 120_000;
 
 /** AMO throttles uploads and says how long to wait, in a header or the error body. */
 export function throttleDelayMs(retryAfter: string | null, body: string): number {
@@ -71,6 +73,7 @@ export class AmoListing {
   private readonly now: () => number;
   private readonly randomId: () => string;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly log: (message: string) => void;
 
   constructor(deps: AmoDeps, addonId: string) {
     this.deps = deps;
@@ -78,6 +81,7 @@ export class AmoListing {
     this.now = deps.now ?? Date.now;
     this.randomId = deps.randomId ?? randomUUID;
     this.sleep = deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
+    this.log = deps.log ?? console.log;
   }
 
   /** Listing fields from amo/metadata.json; the version block only applies to submissions. */
@@ -122,12 +126,17 @@ export class AmoListing {
    */
   async sync(content: ListingContent): Promise<void> {
     await this.setDetails(content.details);
+    this.log("Listing text updated");
     await this.setIcon(content.icon);
+    this.log("Icon uploaded");
     await this.setPrivacyPolicy(content.policy);
+    this.log("Privacy policy updated");
     const existing = await this.previewCount();
+    this.log(`Listing has ${existing} of ${content.screenshots.length} screenshots`);
     for (const [position, screenshot] of content.screenshots.entries()) {
       if (position < existing) continue;
       await this.uploadPreview(screenshot, position);
+      this.log(`Uploaded ${screenshot.name}`);
     }
   }
 
@@ -143,15 +152,18 @@ export class AmoListing {
       const response = await this.deps.fetch(url, {
         ...init,
         headers: { ...init.headers, Authorization: `JWT ${token}` },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       if (response.ok) return response;
 
       const body = await response.text();
+      const method = init.method ?? "GET";
       if (response.status === 429 && attempt < MAX_ATTEMPTS) {
-        await this.sleep(throttleDelayMs(response.headers.get("Retry-After"), body));
+        const delay = throttleDelayMs(response.headers.get("Retry-After"), body);
+        this.log(`Throttled on ${method} ${path || "addon"}, retrying in ${delay / 1000}s`);
+        await this.sleep(delay);
         continue;
       }
-      const method = init.method ?? "GET";
       throw new Error(`AMO ${method} ${path || "addon"} failed (${response.status}): ${body}`);
     }
   }

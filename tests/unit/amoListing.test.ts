@@ -24,6 +24,7 @@ function listing(fetchFn: typeof fetch, sleep = vi.fn(async (_ms: number) => {})
       now: () => 0,
       randomId: () => "jti",
       sleep,
+      log: () => {},
     },
     ADDON,
   );
