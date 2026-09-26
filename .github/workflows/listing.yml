@@ -1,0 +1,37 @@
+name: Listing
+
+# Pushes the addons.mozilla.org listing text, icon, privacy policy and screenshots
+# without cutting a release.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "amo/**"
+      - "PRIVACY.md"
+      - "scripts/amo-listing.ts"
+      - ".github/workflows/listing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: listing
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: [self-hosted, sophie-small]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24.21.0"
+      - name: Update the addons.mozilla.org listing
+        run: node scripts/amo-listing.ts
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}

@@ -82,7 +82,6 @@ jobs:
             cp artifacts/signed/*.xpi artifacts/release/fastmail-alias-creator.xpi
             (cd artifacts/release && sha256sum *.xpi > SHA256SUMS)
           fi
-          node scripts/amo-listing.ts
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}

@@ -21,10 +21,22 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
-const shots = [
-  { name: "1.png", bytes: new Uint8Array([1]) },
-  { name: "2.png", bytes: new Uint8Array([2]) },
-];
+const content = {
+  details: { summary: { "en-US": "Short" } },
+  icon: { name: "icon.png", bytes: new Uint8Array([9]) },
+  policy: "Policy",
+  screenshots: [
+    { name: "1.png", bytes: new Uint8Array([1]) },
+    { name: "2.png", bytes: new Uint8Array([2]) },
+  ],
+};
+
+const withPreviews = (previews: unknown[]) =>
+  vi
+    .fn<typeof fetch>()
+    .mockImplementation(async (url, init) =>
+      json(String(url) === BASE && init?.method === "GET" ? { previews } : {}),
+    );
 
 describe("createAmoJwt", () => {
   it("signs a one minute HS256 token for the API key", () => {
@@ -69,26 +81,31 @@ describe("AmoListing", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ privacy_policy: { "en-US": "Policy text" } });
   });
 
-  it("uploads screenshots in order when the listing has none", async () => {
-    const fetchSpy = vi
-      .fn<typeof fetch>()
-      .mockImplementation(async (url) => json(String(url) === BASE ? { previews: [] } : {}));
-    await listing(fetchSpy).sync("p", shots);
+  it("syncs details, icon and policy, then uploads screenshots in order", async () => {
+    const fetchSpy = withPreviews([]);
+    await listing(fetchSpy).sync(content);
 
-    const posts = fetchSpy.mock.calls.filter(([, init]) => init?.method === "POST");
-    expect(posts.map(([url]) => url)).toEqual([`${BASE}previews/`, `${BASE}previews/`]);
-    const forms = posts.map(([, init]) => init?.body as FormData);
+    const calls = fetchSpy.mock.calls.map(([url, init]) => `${init?.method} ${url}`);
+    expect(calls).toEqual([
+      `PATCH ${BASE}`,
+      `PATCH ${BASE}`,
+      `PATCH ${BASE}eula_policy/`,
+      `GET ${BASE}`,
+      `POST ${BASE}previews/`,
+      `POST ${BASE}previews/`,
+    ]);
+    const [details, icon] = fetchSpy.mock.calls.map(([, init]) => init?.body);
+    expect(JSON.parse(String(details))).toEqual(content.details);
+    expect(((icon as FormData).get("icon") as File).name).toBe("icon.png");
+
+    const forms = fetchSpy.mock.calls.slice(4).map(([, init]) => init?.body as FormData);
     expect(forms.map((form) => form.get("position"))).toEqual(["0", "1"]);
     expect((forms[0]?.get("image") as File).name).toBe("1.png");
   });
 
   it("leaves existing screenshots alone", async () => {
-    const fetchSpy = vi
-      .fn<typeof fetch>()
-      .mockImplementation(async (url) =>
-        json(String(url) === BASE ? { previews: [{ id: 1 }] } : {}),
-      );
-    await listing(fetchSpy).sync("p", shots);
+    const fetchSpy = withPreviews([{ id: 1 }]);
+    await listing(fetchSpy).sync(content);
     expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 
