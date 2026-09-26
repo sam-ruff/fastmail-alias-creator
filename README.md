@@ -4,6 +4,12 @@ A Firefox toolbar button for Fastmail's Masked Email. Open it on a sign-up page,
 
 It also remembers where each alias went. The popup lists the aliases already used on the site you are looking at, and a search tab finds any alias by address, website or note. The website is saved on the alias in Fastmail itself, so aliases made on your phone or through a password manager show up too.
 
+<p>
+  <img src="docs/images/create.png" alt="Popup on github.com after creating an alias, listing the aliases already used there" width="260">
+  <img src="docs/images/search.png" alt="Searching every alias for co.uk" width="260">
+  <img src="docs/images/dark.png" alt="The popup in dark mode" width="260">
+</p>
+
 Inspired by Kevin Graham's [Fastmail Masked Email Creator](https://kevingraham.com/fastmail-masked-email-creator/).
 
 ## Signing in
@@ -13,6 +19,8 @@ Fastmail has to approve each OAuth app by hand, so "Sign in with Fastmail" only 
 1. In Fastmail, go to Settings, Privacy & Security, API tokens.
 2. Create a token with Masked Email access (read-only off).
 3. Paste it into the extension.
+
+<img src="docs/images/sign-in.png" alt="The sign in screen with the API token form open" width="320">
 
 The token is stored in the extension's local storage and only sent to `api.fastmail.com`.
 
