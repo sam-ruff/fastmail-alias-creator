@@ -1,5 +1,7 @@
 # Alias Creator for Fastmail
 
+[![Get it for Firefox](https://img.shields.io/badge/Get_it_for-Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/alias-creator-for-fastmail/)
+
 A Firefox toolbar button for Fastmail's Masked Email. Open it on a sign-up page, click once, and a new alias for that site is created and put on your clipboard.
 
 It also remembers where each alias went. The popup lists the aliases already used on the site you are looking at, and a search tab finds any alias by address, website or note. The website is saved on the alias in Fastmail itself, so aliases made on your phone or through a password manager show up too.
@@ -26,7 +28,7 @@ The token is stored in the extension's local storage and only sent to `api.fastm
 
 ## Installing
 
-Releases are published on addons.mozilla.org, which keeps the extension up to date. The signed `.xpi` is also attached to each GitHub release once Mozilla has approved it.
+Install it from [addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/alias-creator-for-fastmail/), which keeps it up to date. The signed `.xpi` is also attached to each GitHub release once Mozilla has approved it.
 
 ## Development
 
