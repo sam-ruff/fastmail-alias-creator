@@ -1,0 +1,19 @@
+{
+  "name": { "en-US": "Alias Creator for Fastmail" },
+  "slug": "alias-creator-for-fastmail",
+  "summary": {
+    "en-US": "Create a Fastmail Masked Email alias for the site you are on in one click, copied straight to your clipboard, and see which alias you used where."
+  },
+  "description": {
+    "en-US": "A toolbar button for Fastmail's Masked Email.\n\nOpen it on a sign-up page and click \"Create alias and copy\". A new alias is made for that website and put on your clipboard, ready to paste.\n\n**Remembers where each alias went.** The popup lists the aliases you have already used on the current site, and a search tab finds any alias by address, website or note. You can copy, disable or re-enable aliases from there too.\n\n**Works with aliases made elsewhere.** The website is saved on the alias in Fastmail itself, so aliases created on your phone or by a password manager show up as well.\n\n**Signing in.** Paste a Fastmail API token with Masked Email access (Settings, Privacy & Security, API tokens).\n\nRequires a paid Fastmail account. This is an independent project and is not made or endorsed by Fastmail. The source code is on GitHub."
+  },
+  "categories": { "firefox": ["privacy-security"] },
+  "tags": ["privacy"],
+  "homepage": { "en-US": "https://github.com/sam-ruff/fastmail-alias-creator" },
+  "support_url": { "en-US": "https://github.com/sam-ruff/fastmail-alias-creator/issues" },
+  "requires_payment": true,
+  "version": {
+    "license": "MIT",
+    "approval_notes": "Testing needs a Fastmail account and an API token with Masked Email scope (Fastmail Settings > Privacy & Security > API tokens). The only network destination is https://api.fastmail.com. Source is attached; to rebuild: Node 24, `npm ci && npm run build`, output in dist/. The build is not minified."
+  }
+}

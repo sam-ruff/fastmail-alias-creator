@@ -1,4 +1,4 @@
-# Fastmail Alias Creator
+# Alias Creator for Fastmail
 
 A Firefox toolbar button for Fastmail's Masked Email. Open it on a sign-up page, click once, and a new alias for that site is created and put on your clipboard.
 
@@ -10,7 +10,7 @@ It also remembers where each alias went. The popup lists the aliases already use
   <img src="docs/images/dark.png" alt="The popup in dark mode" width="260">
 </p>
 
-Inspired by Kevin Graham's [Fastmail Masked Email Creator](https://kevingraham.com/fastmail-masked-email-creator/).
+Inspired by Kevin Graham's [Fastmail Masked Email Creator](https://kevingraham.com/fastmail-masked-email-creator/). This is an independent project, not made or endorsed by Fastmail.
 
 ## Signing in
 
@@ -22,11 +22,11 @@ Fastmail has to approve each OAuth app by hand, so "Sign in with Fastmail" only 
 
 <img src="docs/images/sign-in.png" alt="The sign in screen with the API token form open" width="320">
 
-The token is stored in the extension's local storage and only sent to `api.fastmail.com`.
+The token is stored in the extension's local storage and only sent to `api.fastmail.com`. The [privacy policy](PRIVACY.md) has the full list of what goes where.
 
 ## Installing
 
-Grab the `.xpi` from the latest release. Release builds of Firefox only install signed extensions, so an unsigned build has to be loaded from `about:debugging` as a temporary add-on, which lasts until Firefox restarts.
+Releases are published on addons.mozilla.org, which keeps the extension up to date. The signed `.xpi` is also attached to each GitHub release once Mozilla has approved it.
 
 ## Development
 
@@ -43,7 +43,7 @@ To build with OAuth enabled, set `FASTMAIL_OAUTH_CLIENT_ID` in the environment o
 
 `FASTMAIL_API_TOKEN=... npm run test:integration` runs a few tests against the real API. It creates one alias and deletes it again.
 
-Commits follow Conventional Commits and releases are cut automatically from `main`.
+Commits follow Conventional Commits and releases are cut automatically from `main`. The addons.mozilla.org listing text lives in `amo/metadata.json` and its screenshots in `amo/screenshots`.
 
 ## Licence
 

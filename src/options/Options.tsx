@@ -30,7 +30,7 @@ export function Options() {
 
   return (
     <main class="options">
-      <h1>Fastmail Alias Creator</h1>
+      <h1>Alias Creator for Fastmail</h1>
 
       <section class="card">
         <h2>Account</h2>

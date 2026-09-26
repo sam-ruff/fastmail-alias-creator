@@ -97,7 +97,7 @@ export class FakeFastmail {
       forDomain: input.forDomain ?? "",
       description: input.description ?? "",
       url: null,
-      createdBy: "Fastmail Alias Creator",
+      createdBy: "Alias Creator for Fastmail",
       createdAt: new Date().toISOString(),
       lastMessageAt: null,
     };

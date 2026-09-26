@@ -14,7 +14,7 @@
     "check": "npm run lint && npm test && npm run build && npm run lint:extension",
     "format": "prettier --write .",
     "start": "web-ext run --source-dir dist",
-    "package": "web-ext build --source-dir dist --artifacts-dir artifacts/release --filename \"fastmail-alias-creator-{version}.xpi\" --overwrite-dest",
+    "package": "web-ext build --source-dir dist --artifacts-dir artifacts/release --filename fastmail-alias-creator.xpi --overwrite-dest",
     "release:plan": "node scripts/release-plan.ts",
     "release": "semantic-release",
     "prepare": "git config core.hooksPath .githooks || true"

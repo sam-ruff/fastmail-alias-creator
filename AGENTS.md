@@ -1,4 +1,4 @@
-# Fastmail Alias Creator development notes
+# Alias Creator for Fastmail development notes
 
 Firefox extension (Manifest V3) that creates Fastmail Masked Email aliases for the current site and keeps a searchable record of which alias belongs to which website.
 
@@ -28,7 +28,9 @@ Unit tests mock the network through injected fakes (`vi.fn` for `MaskedEmailApi`
 
 ## CI and releases
 
-All workflows run on the self-hosted pool (`[self-hosted, sophie]`), never GitHub-hosted runners. `ci.yml` plans the next version with a semantic-release dry run, then stamps, checks, builds and packages the XPI. `release.yml` runs after a successful main push, checks that the plan matches the tested revision, optionally signs with AMO keys and publishes the GitHub release. Pin actions to commit SHAs.
+All workflows run on the self-hosted pool (`[self-hosted, sophie]`), never GitHub-hosted runners. `ci.yml` plans the next version with a semantic-release dry run, then stamps, checks, builds and packages the XPI. `release.yml` runs after a successful main push, checks that the plan matches the tested revision, submits the build to the listed channel on addons.mozilla.org (with a source zip, since Mozilla reviews it) and publishes the GitHub release. A review that outlasts the 20 minute wait is not a failure; that release just has no XPI attached. `scripts/amo-listing.ts` then pushes `PRIVACY.md` as the listing's privacy policy and uploads `amo/screenshots` if the listing has none. Listing text is in `amo/metadata.json`. Pin actions to commit SHAs.
+
+The manifest declares `authenticationInfo` and `browsingActivity` under `data_collection_permissions` because the token and each alias's website go to Fastmail. Update that, `PRIVACY.md` and the listing together if what is sent ever changes. The name must stay in the "... for Fastmail" form to satisfy Mozilla's trademark rules.
 
 Use `Sam R <sam@technesci.co.uk>` for the Git author and committer identity.
 

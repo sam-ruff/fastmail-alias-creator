@@ -20,7 +20,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: [self-hosted, sophie]
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       actions: read
       contents: write
@@ -60,17 +60,30 @@ jobs:
       - name: Install pinned release tooling
         if: steps.plan.outputs.version != ''
         run: npm ci
-      - name: Sign the tested build with Mozilla
+      - name: Submit the tested build to addons.mozilla.org
         if: steps.plan.outputs.version != '' && env.SIGN == 'true'
         run: |
           git archive --format=zip -o artifacts/source.zip HEAD
-          npx web-ext sign --source-dir artifacts/release/dist --channel unlisted \
-            --artifacts-dir artifacts/signed --upload-source-code artifacts/source.zip
-          rm artifacts/release/*.xpi
-          cp artifacts/signed/*.xpi "artifacts/release/fastmail-alias-creator-$VERSION.xpi"
-          (cd artifacts/release && sha256sum *.xpi > SHA256SUMS)
+          # The listing, privacy policy and signed file can lag behind a human review. A review
+          # that outlasts the wait is not a failure: the release ships without an XPI and
+          # addons.mozilla.org publishes the version once it is approved.
+          set +e
+          npx web-ext sign --source-dir artifacts/release/dist --channel listed \
+            --amo-metadata amo/metadata.json --upload-source-code artifacts/source.zip \
+            --approval-timeout 1200000 --artifacts-dir artifacts/signed 2>&1 | tee artifacts/sign.log
+          status=${PIPESTATUS[0]}
+          set -e
+          rm artifacts/release/*.xpi artifacts/release/SHA256SUMS
+          if [ "$status" -ne 0 ]; then
+            grep -q "Approval: timeout exceeded" artifacts/sign.log || exit "$status"
+            echo "::notice::Submitted for review; the version will appear on addons.mozilla.org once approved."
+          else
+            # A fixed name keeps releases/latest/download/fastmail-alias-creator.xpi stable.
+            cp artifacts/signed/*.xpi artifacts/release/fastmail-alias-creator.xpi
+            (cd artifacts/release && sha256sum *.xpi > SHA256SUMS)
+          fi
+          node scripts/amo-listing.ts
         env:
-          VERSION: ${{ steps.plan.outputs.version }}
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
       - name: Publish the tested extension
