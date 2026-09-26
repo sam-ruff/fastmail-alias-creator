@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { AmoListing, createAmoJwt, markdownToPlainText } from "../../scripts/amo-listing";
+import {
+  AmoListing,
+  createAmoJwt,
+  markdownToPlainText,
+  throttleDelayMs,
+} from "../../scripts/amo-listing";
 
 const ADDON = "addon@example.test";
 const BASE = "https://addons.mozilla.org/api/v5/addons/addon/addon%40example.test/";
@@ -10,12 +15,24 @@ function decode(part: string | undefined): Record<string, unknown> {
   return JSON.parse(Buffer.from(part ?? "", "base64url").toString()) as Record<string, unknown>;
 }
 
-function listing(fetchFn: typeof fetch) {
+function listing(fetchFn: typeof fetch, sleep = vi.fn(async (_ms: number) => {})) {
   return new AmoListing(
-    { fetch: fetchFn, apiKey: "key", apiSecret: "secret", now: () => 0, randomId: () => "jti" },
+    {
+      fetch: fetchFn,
+      apiKey: "key",
+      apiSecret: "secret",
+      now: () => 0,
+      randomId: () => "jti",
+      sleep,
+    },
     ADDON,
   );
 }
+
+const throttled = () =>
+  new Response('{"detail":"Request was throttled. Expected available in 55 seconds."}', {
+    status: 429,
+  });
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
@@ -54,6 +71,15 @@ describe("createAmoJwt", () => {
       .update(`${header}.${payload}`)
       .digest("base64url");
     expect(signature).toBe(expected);
+  });
+});
+
+describe("throttleDelayMs", () => {
+  it("prefers Retry-After, then the body, then a minute, plus a second of margin", () => {
+    expect(throttleDelayMs("10", "")).toBe(11_000);
+    expect(throttleDelayMs(null, "Expected available in 55 seconds.")).toBe(56_000);
+    expect(throttleDelayMs(null, "slow down")).toBe(61_000);
+    expect(throttleDelayMs("soon", "")).toBe(61_000);
   });
 });
 
@@ -103,10 +129,41 @@ describe("AmoListing", () => {
     expect((forms[0]?.get("image") as File).name).toBe("1.png");
   });
 
-  it("leaves existing screenshots alone", async () => {
-    const fetchSpy = withPreviews([{ id: 1 }]);
+  it("leaves a complete set of screenshots alone", async () => {
+    const fetchSpy = withPreviews([{ id: 1 }, { id: 2 }]);
     await listing(fetchSpy).sync(content);
     expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("uploads only the screenshots a previous run did not reach", async () => {
+    const fetchSpy = withPreviews([{ id: 1 }]);
+    await listing(fetchSpy).sync(content);
+
+    const posts = fetchSpy.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(posts).toHaveLength(1);
+    const form = posts[0]?.[1]?.body as FormData;
+    expect((form.get("image") as File).name).toBe("2.png");
+    expect(form.get("position")).toBe("1");
+  });
+
+  it("waits out throttling and retries with a fresh request", async () => {
+    const sleep = vi.fn(async (_ms: number) => {});
+    const fetchSpy = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(throttled())
+      .mockResolvedValueOnce(json({}));
+    await listing(fetchSpy, sleep).setPrivacyPolicy("p");
+
+    expect(sleep).toHaveBeenCalledWith(56_000);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after repeated throttling", async () => {
+    const sleep = vi.fn(async (_ms: number) => {});
+    const fetchSpy = vi.fn<typeof fetch>().mockImplementation(async () => throttled());
+    await expect(listing(fetchSpy, sleep).setPrivacyPolicy("p")).rejects.toThrow(/429/);
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(sleep).toHaveBeenCalledTimes(3);
   });
 
   it("reports API errors with the response body", async () => {

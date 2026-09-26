@@ -12,6 +12,15 @@ export interface AmoDeps {
   apiSecret: string;
   now?: () => number;
   randomId?: () => string;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const MAX_ATTEMPTS = 4;
+
+/** AMO throttles uploads and says how long to wait, in a header or the error body. */
+export function throttleDelayMs(retryAfter: string | null, body: string): number {
+  const seconds = Number(retryAfter ?? body.match(/available in (\d+) seconds?/)?.[1] ?? 60);
+  return ((Number.isFinite(seconds) ? seconds : 60) + 1) * 1000;
 }
 
 export interface Screenshot {
@@ -57,17 +66,18 @@ export function markdownToPlainText(markdown: string): string {
 }
 
 export class AmoListing {
-  private readonly now: () => number;
-  private readonly randomId: () => string;
-
   private readonly deps: AmoDeps;
   private readonly addonId: string;
+  private readonly now: () => number;
+  private readonly randomId: () => string;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(deps: AmoDeps, addonId: string) {
     this.deps = deps;
     this.addonId = addonId;
     this.now = deps.now ?? Date.now;
     this.randomId = deps.randomId ?? randomUUID;
+    this.sleep = deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
   }
 
   /** Listing fields from amo/metadata.json; the version block only applies to submissions. */
@@ -106,30 +116,44 @@ export class AmoListing {
     await this.request("previews/", { method: "POST", body: form });
   }
 
-  /** Screenshots are only uploaded to an empty listing so reruns never add duplicates. */
+  /**
+   * Uploads run in order, so a listing with n screenshots already has the first n. Only the
+   * rest are sent, which lets a run interrupted part way resume without duplicates.
+   */
   async sync(content: ListingContent): Promise<void> {
     await this.setDetails(content.details);
     await this.setIcon(content.icon);
     await this.setPrivacyPolicy(content.policy);
-    if ((await this.previewCount()) > 0) return;
+    const existing = await this.previewCount();
     for (const [position, screenshot] of content.screenshots.entries()) {
+      if (position < existing) continue;
       await this.uploadPreview(screenshot, position);
     }
   }
 
   private async request(path: string, init: RequestInit): Promise<Response> {
-    const token = createAmoJwt(this.deps.apiKey, this.deps.apiSecret, this.now(), this.randomId());
-    const response = await this.deps.fetch(
-      `${API_BASE}/${encodeURIComponent(this.addonId)}/${path}`,
-      { ...init, headers: { ...init.headers, Authorization: `JWT ${token}` } },
-    );
-    if (!response.ok) {
-      const method = init.method ?? "GET";
-      throw new Error(
-        `AMO ${method} ${path || "addon"} failed (${response.status}): ${await response.text()}`,
+    const url = `${API_BASE}/${encodeURIComponent(this.addonId)}/${path}`;
+    for (let attempt = 1; ; attempt++) {
+      const token = createAmoJwt(
+        this.deps.apiKey,
+        this.deps.apiSecret,
+        this.now(),
+        this.randomId(),
       );
+      const response = await this.deps.fetch(url, {
+        ...init,
+        headers: { ...init.headers, Authorization: `JWT ${token}` },
+      });
+      if (response.ok) return response;
+
+      const body = await response.text();
+      if (response.status === 429 && attempt < MAX_ATTEMPTS) {
+        await this.sleep(throttleDelayMs(response.headers.get("Retry-After"), body));
+        continue;
+      }
+      const method = init.method ?? "GET";
+      throw new Error(`AMO ${method} ${path || "addon"} failed (${response.status}): ${body}`);
     }
-    return response;
   }
 }
 
